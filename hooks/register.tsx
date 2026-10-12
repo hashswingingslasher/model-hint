@@ -49,6 +49,32 @@ let pending: Timer | undefined
 let inflight: AbortController | undefined
 let generation = 0
 
+// Whether this session draws the band. Learned at the first AbovePrompt render,
+// not from the surface's name: until then the status line under the prompt
+// carries the hint, which every surface draws.
+let hasBand = false
+
+async function mirror($: EngineInterface, settings: Settings): Promise<void> {
+  if (hasBand) return
+  const [hint, enabled, note] = await Promise.all([read($, suggestion), read($, isEnabled), read($, judgeNote)])
+  if (hint === null || !enabled) {
+    $.ui.status(undefined)
+    return
+  }
+  if (hint.source === 'rules' && settings.engine === 'model' && note === null) {
+    $.ui.status('model-hint: reading the draft...')
+    return
+  }
+  const current = tierOf(await $.session.model())
+  const covered = satisfies(current, hint.tier)
+  if (covered && settings.show === 'when-different') {
+    $.ui.status(undefined)
+    return
+  }
+  const tail = covered && current ? `covered by ${current}` : `/model ${hint.tier} to switch`
+  $.ui.status(`model-hint: ${hint.tier} · ${hint.reasons.join(', ')}${note ? ` (${note}, rules' guess)` : ''} · ${tail}`)
+}
+
 function cancelPending(): number {
   pending?.cancel()
   inflight?.abort()
@@ -69,6 +95,7 @@ async function onDraft($: EngineInterface, draft: string, settings: Settings): P
   const held = await read($, suggestion)
   const keepModelVerdict = held?.source === 'model' && rules !== null
   if (!keepModelVerdict) await publish($, rules, isSkippable(draft))
+  await mirror($, settings)
 
   if (settings.engine !== 'model' || rules === null || draft.trim().length < judge.MIN_LENGTH) return
   pending = $.clock.after(PAUSE_MS, () => {
@@ -83,7 +110,9 @@ async function ask($: EngineInterface, draft: string, mine: number, settings: Se
   // A failure is shown in the band and logged; it never sits silently on "reading".
   const fail = async (note: string, detail: string) => {
     $.ui.log(`model-hint: ${note}: ${detail}`, { to: 'debug' })
-    if (mine === generation) await update($, judgeNote, () => note)
+    if (mine !== generation) return
+    await update($, judgeNote, () => note)
+    await mirror($, settings)
   }
   let reply
   try {
@@ -112,6 +141,7 @@ async function ask($: EngineInterface, draft: string, mine: number, settings: Se
   }
   $.ui.log(`model-hint: verdict ${verdict.tier} (${verdict.reasons[0]}) for ${draft.length} chars`, { to: 'debug' })
   await publish($, verdict, false)
+  await mirror($, settings)
 }
 
 export const register: Register = (on, options) => {
@@ -132,6 +162,7 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: COMMAND }, async $ => {
     const enabled = await update($, isEnabled, was => !was)
+    await mirror($, settings)
     return { text: enabled ? 'Model hint on.' : 'Model hint off for this session.' }
   }).catch(() => ({ text: 'Model hint: could not toggle, see the debug log.' }))
 
@@ -158,10 +189,15 @@ export const register: Register = (on, options) => {
     await update($, suggestion, () => null)
     await update($, isDismissed, () => false)
     await update($, judgeNote, () => null)
+    $.ui.status(undefined)
     return next(e)
   }).catch((_$, e, next) => next(e))
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (!hasBand) {
+      hasBand = true
+      $.ui.status(undefined)
+    }
     if (e.props.hasSurvey) return next(e)
 
     const [hint, enabled, dismissed, note] = await Promise.all([

@@ -249,6 +249,53 @@ describe('band', () => {
     expect((await ui.find({ type: 'Text', text: /reading/ }))?.text).toBe('reading the draft...')
   })
 
+  test('without a band, the status line under the prompt carries the hint', async ($, on) => {
+    const w = world(on, 'claude-fable-5-1')
+    w.reply = () => '{"tier":"opus","reason":"open-ended, huge scope"}'
+    const status: (string | undefined)[] = []
+    on('ui.status', (_$, e) => {
+      status.push(e.text)
+      return { value: undefined }
+    })
+    on('prompt.submit', (_$, e) => ({ text: e.text }))
+
+    await type($, 'i need to build a AAA video game similar to GTA 5')
+    expect(status.at(-1)).toBe('model-hint: reading the draft...')
+
+    await w.clock.advance(PAUSE_MS)
+    expect(status.at(-1)).toBe('model-hint: opus · open-ended, huge scope · covered by fable')
+
+    await $.prompt.submit({ text: 'x', wait: false, origin: { kind: 'composer' } })
+    expect(status.at(-1)).toBeUndefined()
+  })
+
+  test('without a band, an uncovered verdict names the /model command', { options: { engine: 'rules' } }, async ($, on) => {
+    world(on, 'claude-opus-5-5')
+    const status: (string | undefined)[] = []
+    on('ui.status', (_$, e) => {
+      status.push(e.text)
+      return { value: undefined }
+    })
+
+    await type($, 'fix the typo in the README')
+    expect(status.at(-1)).toBe('model-hint: haiku · mechanical edit, short ask · /model haiku to switch')
+  })
+
+  test('once a band has drawn, the status line is cleared and left alone', { options: { engine: 'rules' } }, async ($, on) => {
+    world(on, 'claude-opus-5-5')
+    const status: (string | undefined)[] = []
+    on('ui.status', (_$, e) => {
+      status.push(e.text)
+      return { value: undefined }
+    })
+    const ui = await mount($, 'terminal')
+    expect(status).toEqual([undefined])
+
+    await type($, 'fix the typo in the README')
+    expect((await ui.find({ type: 'Text', text: 'haiku' }))?.text).toBe('haiku')
+    expect(status).toEqual([undefined])
+  })
+
   test('engine: rules never calls the model', { options: { engine: 'rules' } }, async ($, on) => {
     const w = world(on, 'claude-opus-5-5')
     const ui = await mount($, 'terminal')

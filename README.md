@@ -9,7 +9,9 @@ opus  open-ended, multi-system game architecture   [ Switch to opus ]  [ Hide ]
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-While you type it says `reading the draft...`; the verdict lands about a second after you pause. The Switch button appears only when the session's model does not cover the verdict; a covered one reads `opus  hard concurrency bug · covered by fable`. The band clears when you submit. Terminal and desktop only; the VS Code panel has no band to draw into.
+While you type it says `reading the draft...`; the verdict lands about a second after you pause. The Switch button appears only when the session's model does not cover the verdict; a covered one reads `opus  hard concurrency bug · covered by fable`. The band clears when you submit.
+
+Where a surface has no band above the prompt (the VS Code panel, mobile), the same hint goes to the plugin status line under the prompt instead: `model-hint: opus · open-ended, huge scope · /model opus to switch`. The mod does not check which surface it is on; it uses the status line until the first time a band is drawn, then leaves the status line alone.
 
 ## Install
 
@@ -64,6 +66,7 @@ Three hooks and one render site, all in [hooks/register.tsx](hooks/register.tsx)
 - `prompt.fill` covers a draft another plugin wrote into the box, which raises no edit.
 - `prompt.submit` clears the hint.
 - `ui.render` on `AbovePrompt` reads the hint, the session's model and the Hide state and draws the band, or yields to the engine. A failed model pass is logged to the debug log (`claude --debug`) and named in the band.
+- `$.ui.status` mirrors the same hint under the prompt on surfaces that never raise a band.
 
 [hooks/classify.ts](hooks/classify.ts) and [hooks/judge.ts](hooks/judge.ts) are pure and have no engine dependency; [hooks/model.ts](hooks/model.ts) maps a model id to a tier. The `$.state` contract is in [types/index.d.ts](types/index.d.ts).
 
