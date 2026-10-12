@@ -36,6 +36,12 @@ describe('classify', () => {
     expect(classify('compare the trade-offs of moving to event sourcing and recommend an approach')?.tier).toBe('opus')
   })
 
+  test('untangling a codebase while debugging is opus, not sonnet', () => {
+    const hint = classify('fix errors in codebase where there are multiple features which need to be separated and made modular while debugging.')
+    expect(hint?.tier).toBe('opus')
+    expect(hint?.reasons).toEqual(['architecture or large refactor', 'wide scope'])
+  })
+
   test('a long multi-step brief lands on opus even without keywords', () => {
     const brief = [
       '1. read the current import pipeline',

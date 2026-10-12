@@ -23,6 +23,8 @@ const words = (list: string[]) => new RegExp(`\\b(?:${list.join('|')})\\b`, 'i')
 const HEAVY_VERBS = words([
   'architect', 'design', 'redesign', 'rearchitect', 'restructure', 'migrate', 'migration',
   'refactor', 'rewrite', 'port', 'overhaul', 'modernize', 'modernise', 'decompose',
+  'modulari[sz]e', 'made modular', 'make .{1,30} modular', 'decouple', 'untangle', 'separat(?:e|ed|ing)',
+  'split (?:up|out|into|apart)', 'break (?:up|apart|out)', 'extract (?:into|out|a|the)', 'consolidate',
 ])
 const HARD_PROBLEMS = words([
   'race condition', 'deadlock', 'memory leak', 'flaky', 'intermittent', 'heisenbug',
@@ -37,8 +39,9 @@ const JUDGMENT = words([
 const WIDE_SCOPE = words([
   'across', 'entire', 'whole', 'all (?:the )?(?:files|modules|packages|services|tests)',
   'codebase', 'monorepo', 'end[- ]to[- ]end', 'every', 'throughout', 'system[- ]wide',
+  '(?:multiple|several|many) (?:features|modules|files|services|components|packages|places)',
 ])
-const DEBUG = words(['debug', 'investigate', 'diagnose', 'figure out', 'why (?:does|is|do|did|are|was|were)', "doesn't work", 'not working', 'broken', 'crash(?:es|ing)?'])
+const DEBUG = words(['debug(?:ging|ged)?', 'investigate', 'troubleshoot(?:ing)?', 'diagnose', 'figure out', 'why (?:does|is|do|did|are|was|were)', "doesn't work", 'not working', 'broken', 'crash(?:es|ing)?'])
 
 const TRIVIAL = words([
   'typo', 'rename', 'spelling', 'capitali[sz]e', 'lowercase', 'uppercase', 'indent',
