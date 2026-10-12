@@ -23,6 +23,8 @@ declare module 'claude-code' {
       isEnabled: boolean
       /** True once the person hides the band for the current draft; reset when the draft is submitted or emptied. */
       isDismissed: boolean
+      /** Why the last model pass gave no verdict, shown in the band in place of "(reading...)"; null while none failed. */
+      judgeNote: string | null
     }
   }
 }

@@ -11,9 +11,10 @@ const COMMAND = 'model-hint'
 const suggestion = atom({ plugin: 'model-hint', key: 'suggestion' } as const, null)
 const isEnabled = atom({ plugin: 'model-hint', key: 'isEnabled' } as const, true)
 const isDismissed = atom({ plugin: 'model-hint', key: 'isDismissed' } as const, false)
+const judgeNote = atom({ plugin: 'model-hint', key: 'judgeNote' } as const, null)
 
 const BIASES: readonly Bias[] = ['balanced', 'cost', 'quality']
-const SHOWS = ['when-different', 'always'] as const
+const SHOWS = ['always', 'when-different'] as const
 const ENGINES = ['model', 'rules'] as const
 type Show = (typeof SHOWS)[number]
 type Engine = (typeof ENGINES)[number]
@@ -64,6 +65,7 @@ async function onDraft($: EngineInterface, draft: string, settings: Settings): P
   const mine = cancelPending()
 
   const rules = classify(draft, settings.bias)
+  await update($, judgeNote, () => null)
   const held = await read($, suggestion)
   const keepModelVerdict = held?.source === 'model' && rules !== null
   if (!keepModelVerdict) await publish($, rules, isSkippable(draft))
@@ -78,25 +80,44 @@ async function onDraft($: EngineInterface, draft: string, settings: Settings): P
 async function ask($: EngineInterface, draft: string, mine: number, settings: Settings): Promise<void> {
   const stop = new AbortController()
   inflight = stop
+  // A failure is shown in the band and logged; it never sits silently on "reading".
+  const fail = async (note: string, detail: string) => {
+    $.ui.log(`model-hint: ${note}: ${detail}`, { to: 'debug' })
+    if (mine === generation) await update($, judgeNote, () => note)
+  }
   let reply
   try {
     reply = await $.model.complete(judge.request(draft, settings.judgeModel), { signal: stop.signal })
-  } catch {
+  } catch (err) {
+    await fail('judge call failed', String(err))
     return
   }
-  if (mine !== generation || !reply.isAnswered) return
+  if (mine !== generation) return
+  if (!reply.isAnswered) {
+    if (reply.reason === 'aborted') return
+    const detail = reply.reason === 'api-error' ? `${reply.status ?? ''} ${reply.error}` : reply.reason
+    await fail(reply.reason === 'api-error' ? 'judge API error' : 'judge gave no answer', detail)
+    return
+  }
 
   const verdict = judge.parse(reply.text)
-  if (verdict === null) return
+  if (verdict === null) {
+    await fail('judge reply unreadable', reply.text.slice(0, 200))
+    return
+  }
   const box = await $.prompt.read()
-  if (box.text !== draft) return
+  if (box.text !== draft) {
+    $.ui.log(`model-hint: draft moved on before the verdict landed (${box.text.length} vs ${draft.length} chars)`, { to: 'debug' })
+    return
+  }
+  $.ui.log(`model-hint: verdict ${verdict.tier} (${verdict.reasons[0]}) for ${draft.length} chars`, { to: 'debug' })
   await publish($, verdict, false)
 }
 
 export const register: Register = (on, options) => {
   const settings: Settings = {
     bias: pick(options.bias, BIASES, 'balanced'),
-    show: pick<Show>(options.show, SHOWS, 'when-different'),
+    show: pick<Show>(options.show, SHOWS, 'always'),
     engine: pick<Engine>(options.engine, ENGINES, 'model'),
     judgeModel: typeof options.judge === 'string' && options.judge.trim() ? options.judge.trim() : 'haiku',
   }
@@ -136,16 +157,18 @@ export const register: Register = (on, options) => {
     cancelPending()
     await update($, suggestion, () => null)
     await update($, isDismissed, () => false)
+    await update($, judgeNote, () => null)
     return next(e)
   }).catch((_$, e, next) => next(e))
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
 
-    const [hint, enabled, dismissed] = await Promise.all([
+    const [hint, enabled, dismissed, note] = await Promise.all([
       read($, suggestion),
       read($, isEnabled),
       read($, isDismissed),
+      read($, judgeNote),
     ])
     if (hint === null || !enabled || dismissed) return next(e)
 
@@ -155,7 +178,17 @@ export const register: Register = (on, options) => {
 
     const { Box, Button, Text } = $.ui.resolve(e)
     const tier = hint.tier
-    const provisional = hint.source === 'rules' && settings.engine === 'model'
+    const hide = <Button key="hide" label="Hide" hotkey="h" onPress={() => update($, isDismissed, () => true)} />
+
+    // The rules' guess is never shown as a tier while the model is still reading.
+    if (hint.source === 'rules' && settings.engine === 'model' && note === null) {
+      return (
+        <Box gap={1}>
+          <Text dimColor>reading the draft...</Text>
+          {hide}
+        </Box>
+      )
+    }
 
     const switchTo = async () => {
       const rows = await $.config.list()
@@ -169,17 +202,24 @@ export const register: Register = (on, options) => {
       else await update($, isDismissed, () => true)
     }
 
+    const detail = [
+      hint.reasons.join(', '),
+      note ? `(${note}, rules' guess)` : '',
+      covered && current ? `· covered by ${current}` : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+
     return (
       <Box gap={1}>
         <Text color={covered ? 'success' : 'suggestion'} bold>
           {tier}
         </Text>
         <Text dimColor wrap="truncate-end">
-          {hint.reasons.join(', ')}
-          {provisional ? ' (reading...)' : ''}
+          {detail}
         </Text>
         {!covered && <Button key="switch" label={`Switch to ${tier}`} hotkey="s" onPress={switchTo} />}
-        <Button key="hide" label="Hide" hotkey="h" onPress={() => update($, isDismissed, () => true)} />
+        {hide}
       </Box>
     )
   })

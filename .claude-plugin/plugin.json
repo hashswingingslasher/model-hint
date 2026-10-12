@@ -1,6 +1,6 @@
 {
   "name": "model-hint",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Suggests haiku, sonnet or opus for the task you are typing, live, in a band above the prompt. Instant word rules, then a small model reads the draft when you pause.",
   "author": {
     "name": "Berwin D.",
@@ -37,13 +37,13 @@
     },
     "show": {
       "type": "string",
-      "title": "When to show the hint",
-      "description": "when-different: only when the suggested tier is not the one you are on. always: for every draft.",
+      "title": "When to show the band",
+      "description": "always: every verdict, with a Switch button only when your model does not cover it. when-different: hide the band entirely when it does.",
       "options": [
-        "when-different",
-        "always"
+        "always",
+        "when-different"
       ],
-      "default": "when-different"
+      "default": "always"
     },
     "bias": {
       "type": "string",

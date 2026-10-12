@@ -22,6 +22,8 @@ type World = {
   asked: string[]
   /** What the judge model answers next; a function may also move the box, to stage a stale verdict. */
   reply: () => string
+  /** When set, the judge model fails with this instead of answering. */
+  failure: ModelCompleteResult | null
 }
 
 const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
@@ -36,6 +38,7 @@ function world(on: On, model: string): World {
     box: { text: '', cursor: 0 },
     asked: [],
     reply: () => '{"tier":"sonnet","reason":"ordinary"}',
+    failure: null,
   }
   on('prompt.edit', (_$, e) => {
     const text = e.text.slice(0, e.start) + e.inputText + e.text.slice(e.end)
@@ -47,7 +50,7 @@ function world(on: On, model: string): World {
   on('ui.render', () => ({ type: 'engine', ref: 0 }))
   on('model.complete', (_$, e) => {
     w.asked.push(e.prompt)
-    const value: ModelCompleteResult = { isAnswered: true, text: w.reply(), usage }
+    const value: ModelCompleteResult = w.failure ?? { isAnswered: true, text: w.reply(), usage }
     return { value }
   })
   return w
@@ -69,34 +72,54 @@ async function mount($: Engine, surface: (typeof SURFACES)[number]) {
 
 describe('band', () => {
   for (const surface of SURFACES) {
-    test(`${surface}: draws the hint when the task wants another tier`, async ($, on) => {
-      world(on, 'claude-opus-5-5')
+    test(`${surface}: draws the verdict with a Switch button when the task wants another tier`, async ($, on) => {
+      const w = world(on, 'claude-opus-5-5')
+      w.reply = () => '{"tier":"haiku","reason":"one-line typo fix"}'
       const ui = await mount($, surface)
       await type($, 'fix the typo in the README')
+      await w.clock.advance(PAUSE_MS)
 
       expect((await ui.find({ type: 'Text', text: 'haiku' }))?.text).toBe('haiku')
-      expect((await ui.find({ type: 'Text', text: /mechanical/ }))?.text).toContain('mechanical edit')
+      expect((await ui.find({ type: 'Text', text: /typo/ }))?.text).toBe('one-line typo fix')
       expect(await ui.find({ key: 'switch' })).toBeDefined()
       expect(await ui.find({ key: 'hide' })).toBeDefined()
     })
 
-    test(`${surface}: stays quiet while the session's model already covers the task`, async ($, on) => {
-      world(on, 'claude-haiku-5-5')
+    test(`${surface}: a covered verdict shows without a Switch button`, async ($, on) => {
+      const w = world(on, 'claude-haiku-5-5')
+      w.reply = () => '{"tier":"haiku","reason":"one-line typo fix"}'
       const ui = await mount($, surface)
       await type($, 'fix the typo in the README')
+      await w.clock.advance(PAUSE_MS)
 
-      expect(await ui.find({ type: 'Text', text: 'haiku' })).toBeUndefined()
+      expect((await ui.find({ type: 'Text', text: 'haiku' }))?.text).toBe('haiku')
+      expect((await ui.find({ type: 'Text', text: /covered/ }))?.text).toBe('one-line typo fix · covered by haiku')
+      expect(await ui.find({ key: 'switch' })).toBeUndefined()
     })
 
     test(`${surface}: fable covers an opus-grade task`, async ($, on) => {
-      world(on, 'claude-fable-5-1')
+      const w = world(on, 'claude-fable-5-1')
+      w.reply = () => '{"tier":"opus","reason":"hard concurrency bug"}'
       const ui = await mount($, surface)
       await type($, 'there is a race condition in the job queue, find the root cause')
+      await w.clock.advance(PAUSE_MS)
 
-      expect(await ui.find({ type: 'Text', text: 'opus' })).toBeUndefined()
+      expect((await ui.find({ type: 'Text', text: /covered/ }))?.text).toBe('hard concurrency bug · covered by fable')
+      expect(await ui.find({ key: 'switch' })).toBeUndefined()
     })
 
-    test(`${surface}: Hide removes the band until the hint changes`, async ($, on) => {
+    test(`${surface}: show=when-different hides a covered verdict entirely`, { options: { show: 'when-different' } }, async ($, on) => {
+      const w = world(on, 'claude-haiku-5-5')
+      w.reply = () => '{"tier":"haiku","reason":"one-line typo fix"}'
+      const ui = await mount($, surface)
+      await type($, 'fix the typo in the README')
+      await w.clock.advance(PAUSE_MS)
+
+      expect(await ui.find({ type: 'Text', text: 'haiku' })).toBeUndefined()
+      expect(await ui.find({ key: 'hide' })).toBeUndefined()
+    })
+
+    test(`${surface}: Hide removes the band until the hint changes`, { options: { engine: 'rules' } }, async ($, on) => {
       world(on, 'claude-haiku-5-5')
       const ui = await mount($, surface)
       await type($, 'add a --verbose flag to the CLI and log the resolved config when it is set')
@@ -114,7 +137,7 @@ describe('band', () => {
       expect((await ui.find({ type: 'Text', text: /refactor/ }))?.text).toContain('refactor')
     })
 
-    test(`${surface}: submitting clears the hint`, async ($, on) => {
+    test(`${surface}: submitting clears the hint`, { options: { engine: 'rules' } }, async ($, on) => {
       world(on, 'claude-opus-5-5')
       on('prompt.submit', (_$, e) => ({ text: e.text }))
       const ui = await mount($, surface)
@@ -132,8 +155,9 @@ describe('band', () => {
       const draft = 'i need to build a AAA video game similar to GTA 5 in volume and playability.'
       await type($, draft)
 
-      // Rules alone: sonnet, which the session covers, so nothing drawn, and no model call yet.
+      // Before the pause: no tier shown, only that the model is reading, and no call yet.
       expect(await ui.find({ type: 'Text', text: 'sonnet' })).toBeUndefined()
+      expect((await ui.find({ type: 'Text', text: /reading/ }))?.text).toBe('reading the draft...')
       expect(w.asked).toEqual([])
 
       await w.clock.advance(PAUSE_MS)
@@ -178,12 +202,14 @@ describe('band', () => {
     expect(await ui.find({ type: 'Text', text: 'opus' })).toBeUndefined()
   })
 
-  test('the band says the rules are provisional while the model reads', async ($, on) => {
+  test('no tier is shown while the model reads', async ($, on) => {
     const w = world(on, 'claude-opus-5-5')
     w.reply = () => '{"tier":"haiku","reason":"one-line typo fix"}'
     const ui = await mount($, 'terminal')
     await type($, 'fix the typo in the README')
-    expect((await ui.find({ type: 'Text', text: /reading/ }))?.text).toContain('(reading...)')
+    expect((await ui.find({ type: 'Text', text: /reading/ }))?.text).toBe('reading the draft...')
+    expect(await ui.find({ type: 'Text', text: 'haiku' })).toBeUndefined()
+    expect(await ui.find({ key: 'switch' })).toBeUndefined()
 
     await w.clock.advance(PAUSE_MS)
     expect(await ui.find({ type: 'Text', text: /reading/ })).toBeUndefined()
@@ -206,6 +232,23 @@ describe('band', () => {
     expect(await ui.find({ type: 'Text', text: 'opus' })).toBeUndefined()
   })
 
+  test('a failed model pass is named in the band, not left on reading', async ($, on) => {
+    const w = world(on, 'claude-opus-5-5')
+    w.failure = { isAnswered: false, reason: 'api-error', status: 429, error: 'rate_limit', usage }
+    const ui = await mount($, 'terminal')
+    await type($, 'fix the typo in the README')
+    await w.clock.advance(PAUSE_MS)
+
+    // The rules' guess stands in, labelled as such.
+    expect((await ui.find({ type: 'Text', text: /judge/ }))?.text).toContain("(judge API error, rules' guess)")
+    expect((await ui.find({ type: 'Text', text: 'haiku' }))?.text).toBe('haiku')
+
+    // The next edit clears the note and tries again.
+    await type($, 'fix the typo in the README now')
+    expect(await ui.find({ type: 'Text', text: /judge/ })).toBeUndefined()
+    expect((await ui.find({ type: 'Text', text: /reading/ }))?.text).toBe('reading the draft...')
+  })
+
   test('engine: rules never calls the model', { options: { engine: 'rules' } }, async ($, on) => {
     const w = world(on, 'claude-opus-5-5')
     const ui = await mount($, 'terminal')
@@ -215,18 +258,10 @@ describe('band', () => {
     expect(w.asked).toEqual([])
     expect(await ui.find({ type: 'Text', text: /reading/ })).toBeUndefined()
     expect((await ui.find({ type: 'Text', text: 'haiku' }))?.text).toBe('haiku')
+    expect((await ui.find({ type: 'Text', text: /mechanical/ }))?.text).toContain('mechanical edit')
   })
 
-  test('show: always draws the hint even when covered', { options: { show: 'always' } }, async ($, on) => {
-    world(on, 'claude-haiku-5-5')
-    const ui = await mount($, 'terminal')
-    await type($, 'fix the typo in the README')
-
-    expect((await ui.find({ type: 'Text', text: 'haiku' }))?.text).toBe('haiku')
-    expect(await ui.find({ key: 'switch' })).toBeUndefined()
-  })
-
-  test('bias: cost holds a borderline ask on sonnet', { options: { bias: 'cost' } }, async ($, on) => {
+  test('bias: cost holds a borderline ask on sonnet', { options: { bias: 'cost', engine: 'rules' } }, async ($, on) => {
     world(on, 'claude-opus-5-5')
     const ui = await mount($, 'terminal')
     await type($, 'investigate why the nightly build is broken')
