@@ -1,0 +1,25 @@
+{
+  "name": "model-hint",
+  "description": "Berwin's Claude Code mods: model-hint, a live model-tier hint above the prompt",
+  "owner": {
+    "name": "Berwin D.",
+    "url": "https://github.com/hashswingingslasher"
+  },
+  "plugins": [
+    {
+      "name": "model-hint",
+      "source": "./",
+      "description": "Suggests haiku, sonnet or opus for the task you are typing, live, in a band above the prompt",
+      "version": "0.1.0",
+      "license": "MIT",
+      "keywords": [
+        "model",
+        "routing",
+        "haiku",
+        "sonnet",
+        "opus",
+        "mod"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "model-hint",
+  "version": "0.1.0",
+  "description": "Suggests haiku, sonnet or opus for the task you are typing, live, in a band above the prompt",
+  "author": { "name": "Berwin D.", "url": "https://github.com/hashswingingslasher" },
+  "homepage": "https://github.com/hashswingingslasher/model-hint",
+  "repository": "https://github.com/hashswingingslasher/model-hint",
+  "license": "MIT",
+  "keywords": ["model", "routing", "haiku", "sonnet", "opus", "mod"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "show": {
+      "type": "string",
+      "title": "When to show the hint",
+      "description": "when-different: only when the suggested tier is not the one you are on. always: for every draft.",
+      "options": ["when-different", "always"],
+      "default": "when-different"
+    },
+    "bias": {
+      "type": "string",
+      "title": "Bias",
+      "description": "cost leans toward cheaper tiers, quality toward stronger ones, balanced sits between.",
+      "options": ["balanced", "cost", "quality"],
+      "default": "balanced"
+    }
+  }
+}
