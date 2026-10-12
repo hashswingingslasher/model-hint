@@ -108,5 +108,5 @@ export function classify(draft: string, bias: Bias = 'balanced'): Suggestion | n
     .map(s => s.label)
   const reasons = towards.length > 0 ? towards.slice(0, 2) : ['ordinary coding task']
 
-  return { tier, reasons, score }
+  return { tier, reasons, score, source: 'rules' }
 }

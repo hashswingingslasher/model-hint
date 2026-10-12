@@ -1,13 +1,17 @@
 /** The three tiers the hint picks between. */
 export type Tier = 'haiku' | 'sonnet' | 'opus'
 
+/** What produced a suggestion: the instant word rules, or the small model that reads the draft after a pause. */
+export type Source = 'rules' | 'model'
+
 /** What the classifier concluded about the current draft. */
 export type Suggestion = {
   tier: Tier
   /** Short, human-readable grounds for the pick, e.g. "typo fix, one line". */
   reasons: string[]
-  /** Net score: negative leans haiku, positive leans opus. Kept for tests and debugging. */
+  /** The rules' net score: negative leans haiku, positive leans opus. 0 for a model verdict. */
   score: number
+  source: Source
 }
 
 declare module 'claude-code' {
