@@ -51,7 +51,8 @@ let generation = 0
 
 // Whether this session draws the band. Learned at the first AbovePrompt render,
 // not from the surface's name: until then the status line under the prompt
-// carries the hint, which every surface draws.
+// carries the hint. That covers surfaces with a status line but no band; it does
+// nothing in the VS Code panel, where prompt.edit never fires.
 let hasBand = false
 
 async function mirror($: EngineInterface, settings: Settings): Promise<void> {

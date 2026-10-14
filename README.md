@@ -9,9 +9,30 @@ opus  open-ended, multi-system game architecture   [ Switch to opus ]  [ Hide ]
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-While you type it says `reading the draft...`; the verdict lands about a second after you pause. The Switch button appears only when the session's model does not cover the verdict; a covered one reads `opus  hard concurrency bug · covered by fable`. The band clears when you submit.
+While you type it says `reading the draft...`; the verdict lands about two seconds after you stop typing (a 600 ms pause, then a haiku call that measured 1.3 to 1.6 s). The Switch button appears only when the session's model does not cover the verdict; a covered one reads `opus  hard concurrency bug · covered by fable`. The band clears when you submit.
 
-Where a surface has no band above the prompt (the VS Code panel, mobile), the same hint goes to the plugin status line under the prompt instead: `model-hint: opus · open-ended, huge scope · /model opus to switch`. The mod does not check which surface it is on; it uses the status line until the first time a band is drawn, then leaves the status line alone.
+## Where it runs
+
+| Where | Works | Notes |
+| :- | :- | :- |
+| Claude Code in a terminal | Yes | Seen working on 2.1.296 and 2.1.299 |
+| VS Code, terminal mode | Yes | Same engine as above; setup below |
+| VS Code, graphical chat panel | No | The panel sends no keystroke events to mods and has no band to draw into. Tracked upstream in [#99045](https://github.com/anthropics/claude-code/issues/99045) and [#99401](https://github.com/anthropics/claude-code/issues/99401) |
+| JetBrains terminal, Claude Code Desktop | Expected | Not yet seen working |
+| Windows | Untested | |
+
+**VS Code setup.** The extension's terminal mode runs whatever `claude` is first on your PATH, and the extension does not install one.
+
+1. Install or upgrade the standalone CLI to 2.1.296 or later (`npm i -g @anthropic-ai/claude-code`), and check `claude --version` in a new terminal.
+2. In VS Code settings, turn on `claudeCode.useTerminal`.
+3. Install the plugin at user scope (below).
+4. Open Claude Code. It now opens in a terminal tab, with the band above the prompt.
+
+Terminal mode keeps inline diffs but gives up the panel's plan review, @-mention chips and click-to-rewind.
+
+## Why not just route automatically
+
+Some tools pick a model for you without saying so. model-hint does the opposite: it tells you which tier it thinks the task needs and why, before you send, and leaves the choice with you. Nothing changes unless you press Switch. When it is wrong, you can see its reason and ignore it.
 
 ## Install
 
@@ -19,7 +40,7 @@ Where a surface has no band above the prompt (the VS Code panel, mobile), the sa
 /plugin install model-hint --marketplace hashswingingslasher/model-hint
 ```
 
-Answer `y` to add the marketplace, then pick a scope. The band is live in that session from then on. Needs a Claude Code build with function hooks (mods), 2.1.296 or later.
+Answer `y` to add the marketplace, then pick the user scope so it loads in every session. Needs a Claude Code build with function hooks (mods), 2.1.296 or later.
 
 To run it from a checkout instead:
 
@@ -66,7 +87,7 @@ Three hooks and one render site, all in [hooks/register.tsx](hooks/register.tsx)
 - `prompt.fill` covers a draft another plugin wrote into the box, which raises no edit.
 - `prompt.submit` clears the hint.
 - `ui.render` on `AbovePrompt` reads the hint, the session's model and the Hide state and draws the band, or yields to the engine. A failed model pass is logged to the debug log (`claude --debug`) and named in the band.
-- `$.ui.status` mirrors the same hint under the prompt on surfaces that never raise a band.
+- `$.ui.status` mirrors the hint under the prompt until a band has drawn once. It is kept for surfaces not yet checked, such as mobile; it does not help in the VS Code panel, where none of the hooks above fire.
 
 [hooks/classify.ts](hooks/classify.ts) and [hooks/judge.ts](hooks/judge.ts) are pure and have no engine dependency; [hooks/model.ts](hooks/model.ts) maps a model id to a tier. The `$.state` contract is in [types/index.d.ts](types/index.d.ts).
 
@@ -80,6 +101,8 @@ npm install && npm run typecheck
 
 `tsc` needs the API declarations the engine lays in `.claude-plugin/types/` the first time it loads the mod from this folder (`claude --plugin-dir .`). They are gitignored.
 
+**Live check (14 Oct 2026, haiku judge, 10 prompts labelled before the run: 3 haiku, 4 sonnet, 3 opus).** 10 of 10 matched. Each judge call took 1.3 to 1.6 s (median 1.5 s), so a verdict lands about 2.1 s after typing stops.
+
 Tests cover the rules on their own, the judge's prompt and reply parsing, the model-id mapping, and the band on both the terminal and desktop surfaces: it draws when the tier differs, stays quiet when covered, hides and comes back, clears on submit, takes the model's verdict after the pause, cancels the pass when typing resumes, and drops a verdict for a draft that moved on. The judge model and the clock are mocked.
 
 ## Limits
@@ -87,6 +110,7 @@ Tests cover the rules on their own, the judge's prompt and reply parsing, the mo
 - The rules pass reads words, not intent, and is only there to answer instantly. The model pass is the real judgment, and it costs one small completion per pause; set `engine` to `rules` to avoid that.
 - It knows three tiers. Provider-specific ids are mapped by the substring `haiku`, `sonnet`, `opus` or `fable`; anything else is treated as unknown and the band always shows.
 - The switch button depends on the `/config` Model row, which policy can lock.
+- Mods are an early-access Claude Code API and can change between releases.
 
 ## License
 

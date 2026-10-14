@@ -10,7 +10,7 @@
       "name": "model-hint",
       "source": "./",
       "description": "Suggests haiku, sonnet or opus for the task you are typing, live, in a band above the prompt",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "license": "MIT",
       "keywords": [
         "model",
