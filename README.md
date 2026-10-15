@@ -1,6 +1,6 @@
 # model-hint
 
-A Claude Code mod that reads the prompt as you type and suggests the model tier the task wants, in a band above the prompt. Two passes: word rules answer on every keystroke for free, then, once you pause for 600 ms, a small model (haiku by default) reads the draft and its verdict replaces the rules'. One short completion per pause, nothing while you are typing.
+A Claude Code mod that reads the prompt as you type and suggests the model tier the task wants, in a band above the prompt. Two passes: word rules answer on every keystroke for free, then, once you pause for 300 ms, a small model (haiku by default) reads the draft and its verdict replaces the rules'. One short completion per pause, nothing while you are typing.
 
 ```
 opus  open-ended, multi-system game architecture   [ Switch to opus ]  [ Hide ]
@@ -9,7 +9,7 @@ opus  open-ended, multi-system game architecture   [ Switch to opus ]  [ Hide ]
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-While you type it says `reading the draft...`; the verdict lands about two seconds after you stop typing (a 600 ms pause, then a haiku call that measured 1.3 to 1.6 s). The Switch button appears only when the session's model does not cover the verdict; a covered one reads `opus  hard concurrency bug · covered by fable`. The band clears when you submit.
+While you type it says `reading the draft...`; the verdict lands 1.2 to 1.9 s after you stop typing (a 300 ms pause, then a haiku call that measured 0.9 to 1.6 s). A draft judged once in the session answers instantly from a cache. The Switch button appears only when the session's model does not cover the verdict; a covered one reads `opus  hard concurrency bug · covered by fable`. The band clears when you submit.
 
 ## Where it runs
 
@@ -101,7 +101,7 @@ npm install && npm run typecheck
 
 `tsc` needs the API declarations the engine lays in `.claude-plugin/types/` the first time it loads the mod from this folder (`claude --plugin-dir .`). They are gitignored.
 
-**Live check (14 Oct 2026, haiku judge, 10 prompts labelled before the run: 3 haiku, 4 sonnet, 3 opus).** 10 of 10 matched. Each judge call took 1.3 to 1.6 s (median 1.5 s), so a verdict lands about 2.1 s after typing stops.
+**Live check (haiku judge, 10 prompts labelled before the run: 3 haiku, 4 sonnet, 3 opus).** 10 of 10 matched (14 Oct 2026). In live terminal sessions on 15 Oct the verdict landed 1.2 to 1.9 s after the last keystroke, median about 1.5 s. Run with `claude --debug` to see the same timing for your own prompts: each verdict logs its time after the last edit, split into the pause and the judge call.
 
 Tests cover the rules on their own, the judge's prompt and reply parsing, the model-id mapping, and the band on both the terminal and desktop surfaces: it draws when the tier differs, stays quiet when covered, hides and comes back, clears on submit, takes the model's verdict after the pause, cancels the pass when typing resumes, and drops a verdict for a draft that moved on. The judge model and the clock are mocked.
 

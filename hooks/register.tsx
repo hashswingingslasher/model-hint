@@ -19,8 +19,15 @@ const ENGINES = ['model', 'rules'] as const
 type Show = (typeof SHOWS)[number]
 type Engine = (typeof ENGINES)[number]
 
-/** How long the person must pause before the model reads the draft. */
-export const PAUSE_MS = 600
+/**
+ * How long the person must pause before the model reads the draft. A judge call
+ * measured 0.8 to 1.4 s (median about 0.95 s), so 300 ms keeps the verdict near
+ * 1.25 s after typing stops; a stray keystroke only aborts the call in flight.
+ */
+export const PAUSE_MS = 300
+
+/** Verdicts kept per session, so a draft judged once answers instantly. */
+const CACHE_SIZE = 64
 
 type Settings = { bias: Bias; show: Show; engine: Engine; judgeModel: string }
 
@@ -48,6 +55,26 @@ async function publish($: EngineInterface, next: Suggestion | null, force: boole
 let pending: Timer | undefined
 let inflight: AbortController | undefined
 let generation = 0
+
+// Verdicts by judge model and trimmed draft, oldest first. Backspacing to a
+// draft already judged, or pausing twice on the same text, costs no call.
+const verdicts = new Map<string, Suggestion>()
+
+// Wall-clock time of the last edit, for the debug log's latency line only.
+let editedAt = 0
+
+function cacheKey(settings: Settings, draft: string): string {
+  return `${settings.judgeModel}\u0000${draft.trim()}`
+}
+
+function remember(key: string, verdict: Suggestion): void {
+  verdicts.delete(key)
+  verdicts.set(key, verdict)
+  if (verdicts.size > CACHE_SIZE) {
+    const oldest = verdicts.keys().next().value
+    if (oldest !== undefined) verdicts.delete(oldest)
+  }
+}
 
 // Whether this session draws the band. Learned at the first AbovePrompt render,
 // not from the surface's name: until then the status line under the prompt
@@ -90,9 +117,18 @@ function cancelPending(): number {
  */
 async function onDraft($: EngineInterface, draft: string, settings: Settings): Promise<void> {
   const mine = cancelPending()
+  editedAt = Date.now()
 
   const rules = classify(draft, settings.bias)
   await update($, judgeNote, () => null)
+
+  const known = settings.engine === 'model' && rules !== null ? verdicts.get(cacheKey(settings, draft)) : undefined
+  if (known) {
+    await publish($, known, false)
+    await mirror($, settings)
+    return
+  }
+
   const held = await read($, suggestion)
   const keepModelVerdict = held?.source === 'model' && rules !== null
   if (!keepModelVerdict) await publish($, rules, isSkippable(draft))
@@ -108,6 +144,7 @@ async function onDraft($: EngineInterface, draft: string, settings: Settings): P
 async function ask($: EngineInterface, draft: string, mine: number, settings: Settings): Promise<void> {
   const stop = new AbortController()
   inflight = stop
+  const firedAt = Date.now()
   // A failure is shown in the band and logged; it never sits silently on "reading".
   const fail = async (note: string, detail: string) => {
     $.ui.log(`model-hint: ${note}: ${detail}`, { to: 'debug' })
@@ -140,7 +177,13 @@ async function ask($: EngineInterface, draft: string, mine: number, settings: Se
     $.ui.log(`model-hint: draft moved on before the verdict landed (${box.text.length} vs ${draft.length} chars)`, { to: 'debug' })
     return
   }
-  $.ui.log(`model-hint: verdict ${verdict.tier} (${verdict.reasons[0]}) for ${draft.length} chars`, { to: 'debug' })
+  remember(cacheKey(settings, draft), verdict)
+  const now = Date.now()
+  $.ui.log(
+    `model-hint: verdict ${verdict.tier} (${verdict.reasons[0]}) ${now - editedAt} ms after the last edit ` +
+      `(timer ${firedAt - editedAt} ms, judge call ${now - firedAt} ms)`,
+    { to: 'debug' },
+  )
   await publish($, verdict, false)
   await mirror($, settings)
 }

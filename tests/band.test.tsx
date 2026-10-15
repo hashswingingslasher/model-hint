@@ -296,6 +296,22 @@ describe('band', () => {
     expect(status).toEqual([undefined])
   })
 
+  test('a draft judged once is answered from the cache, without a call', async ($, on) => {
+    const w = world(on, 'claude-opus-5-5')
+    w.reply = () => '{"tier":"haiku","reason":"one-line typo fix"}'
+    const ui = await mount($, 'terminal')
+    await type($, 'fix the typo in the README')
+    await w.clock.advance(PAUSE_MS)
+    expect(w.asked).toHaveLength(1)
+
+    await type($, 'fix the typo in the README and the LICENSE')
+    await type($, 'fix the typo in the README')
+    // Back on a judged draft: the verdict is there at once, no timer, no call.
+    expect((await ui.find({ type: 'Text', text: /typo/ }))?.text).toBe('one-line typo fix')
+    await w.clock.advance(PAUSE_MS * 3)
+    expect(w.asked).toHaveLength(1)
+  })
+
   test('engine: rules never calls the model', { options: { engine: 'rules' } }, async ($, on) => {
     const w = world(on, 'claude-opus-5-5')
     const ui = await mount($, 'terminal')

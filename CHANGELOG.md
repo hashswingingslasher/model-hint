@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0, 15 October 2026
+
+- Faster verdicts: the pause before the judge drops from 600 ms to 300 ms, and a draft judged once in the session answers instantly from a cache. Live, the verdict now lands 1.2 to 1.9 s after the last keystroke (median about 1.5 s), down from about 2.1 s.
+- The debug log times every verdict, split into the pause and the judge call.
+
 ## 0.4.1, 14 October 2026
 
 - **Retraction.** 0.4.0 said the VS Code chat panel shows the hint on the status line. It does not: the panel sends no keystroke events to mods, so nothing triggers it. The README now has a "Where it runs" table and a four-step VS Code setup through terminal mode. See [docs/adr/0001](docs/adr/0001-terminal-first-vscode-reach.md).

@@ -23,7 +23,7 @@ Do not build a VS Code companion extension. Reach VS Code users through terminal
 
 1. v0.4.1 removes the panel claim, adds a "Where it runs" table with the four-step VS Code setup, and corrects the `mirror()` comment. `mirror()` stays until mobile is checked.
 2. Terminal mode was verified on the PATH CLI after the upgrade: the band drew and the haiku verdict landed (14 October, 2.1.299).
-3. The judge was measured live before any demo: 10 prompts labelled beforehand (3 haiku, 4 sonnet, 3 opus). Result: 10 of 10 matched; each call took 1.3 to 1.6 s, so a verdict lands about 2.1 s after typing stops. The 1.5 s target was missed and is open (see Consequences).
+3. The judge was measured live before any demo: 10 prompts labelled beforehand (3 haiku, 4 sonnet, 3 opus). Result: 10 of 10 matched; each call took 1.3 to 1.6 s, so a verdict lands about 2.1 s after typing stops. The 1.5 s target was missed at first; 0.5.0 cut the pause to 300 ms and caches verdicts, bringing the live median to about 1.5 s (range 1.2 to 1.9 s, mostly network time in the judge call).
 
 Not built: a status-bar companion that updates after send, a companion with its own input box, a file bridge between the mod and an extension, API-key handling, Marketplace publishing.
 
@@ -43,7 +43,7 @@ Bad:
 - People who stay in the VS Code graphical panel, probably the largest group, get nothing until Anthropic implements the surface.
 - The VS Code path costs four steps and gives up plan review, @-mention chips and click-to-rewind.
 - Mods are early access; an engine update can break the band.
-- The verdict takes about 2.1 s after typing stops, slower than the 1.5 s target.
+- The verdict depends on a network call: 1.2 to 1.9 s after typing stops, median about 1.5 s.
 
 ## Alternatives considered
 
