@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Typecheck the pure core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # classify.ts and model.ts import nothing from the engine, so they check
+      # without the API declarations Claude Code lays down when it loads the mod.
+      - run: npx -y -p typescript@5.6.3 tsc -p tsconfig.core.json
+
+  plugin:
+    name: Validate and test on Claude Code ${{ matrix.claude }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The minimum version the README promises.
+          - claude: 2.1.296
+            experimental: false
+          # Mods are an early-access API; a failure here flags drift without blocking.
+          - claude: latest
+            experimental: true
+    continue-on-error: ${{ matrix.experimental }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g @anthropic-ai/claude-code@${{ matrix.claude }}
+      - run: claude --version
+      - run: claude plugin validate --strict .
+      - run: claude plugin test .
