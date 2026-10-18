@@ -2,12 +2,9 @@
 
 A Claude Code mod that reads the prompt as you type and suggests the model tier the task wants, in a band above the prompt. Two passes: word rules answer on every keystroke for free, then, once you pause for 300 ms, a small model (haiku by default) reads the draft and its verdict replaces the rules'. One short completion per pause, nothing while you are typing.
 
-```
-opus  open-ended, multi-system game architecture   [ Switch to opus ]  [ Hide ]
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ > i need to build a AAA video game similar to GTA 5 in volume and playability │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+![model-hint suggesting opus, haiku and sonnet for three drafts in a Claude Code session on Sonnet](docs/demo.gif)
+
+Recorded live with [docs/record-demo.sh](docs/record-demo.sh), from the script in [docs/demo.tape](docs/demo.tape).
 
 While you type it says `reading the draft...`; the verdict lands 1.2 to 1.9 s after you stop typing (a 300 ms pause, then a haiku call that measured 0.9 to 1.6 s). A draft judged once in the session answers instantly from a cache. The Switch button appears only when the session's model does not cover the verdict; a covered one reads `opus  hard concurrency bug · covered by fable`. The band clears when you submit.
 
