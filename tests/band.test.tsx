@@ -370,7 +370,7 @@ describe('band', () => {
   test('a draft that looks like a secret is never sent, and the band says why', async ($, on) => {
     const w = world(on, 'claude-opus-5-5')
     const ui = await mount($, 'terminal')
-    await type($, 'why does this key fail: ' + 'sk-ant-' + 'api03-' + 'q'.repeat(30))
+    await type($, ['why does this key fail: sk', '-an', 't-api03-', 'q'.repeat(30)].join(''))
     await w.clock.advance(PAUSE_MS * 5)
 
     expect(w.asked).toEqual([])

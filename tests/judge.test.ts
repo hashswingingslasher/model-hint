@@ -54,14 +54,15 @@ describe('judge hardening', () => {
   })
 
   test('credentials are recognised; ordinary text is not', () => {
-    // Built at run time, so secret scanners do not mistake the fixtures for real keys.
-    const fake = (prefix: string, body: string) => prefix + body
+    // Assembled from pieces at run time: no fixture appears whole in the source, so secret
+    // scanners do not take these test strings for real credentials.
+    const join = (...parts: string[]) => parts.join('')
     for (const secret of [
-      fake('sk-ant-', 'api03-' + 'q'.repeat(24)),
-      fake('ghp', '_' + 'q'.repeat(36)),
-      fake('AKIA', 'Q'.repeat(16)),
-      fake('-----BEGIN OPENSSH ', 'PRIVATE KEY-----'),
-      fake('xoxb', '-' + '1'.repeat(10) + '-' + 'q'.repeat(10)),
+      join('sk', '-an', 't-', 'api03-', 'q'.repeat(24)),
+      join('gh', 'p_', 'q'.repeat(36)),
+      join('AK', 'IA', 'Q'.repeat(16)),
+      join('-----BEGIN OPENSSH ', 'PRIV', 'ATE KEY-----'),
+      join('xo', 'xb-', '1'.repeat(10), '-', 'q'.repeat(10)),
     ]) expect(looksSecret(`please check ${secret} for me`)).toBe(true)
     for (const fine of ['fix the sk- prefix handling', 'rename AKIA to AWS', 'add a private key loader']) {
       expect(looksSecret(fine)).toBe(false)

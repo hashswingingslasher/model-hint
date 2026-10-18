@@ -4,7 +4,7 @@
 
 A Claude Code mod that reads the prompt as you type and suggests the model tier the task wants, in a band above the prompt. Two passes: word rules answer on every keystroke for free, then, once you pause for 300 ms, a small model (haiku by default) reads the draft and its verdict replaces the rules'. One short completion per pause, nothing while you are typing.
 
-![model-hint suggesting opus, haiku and sonnet for three drafts in a Claude Code session on Sonnet](docs/demo.gif)
+![model-hint suggesting opus, haiku and sonnet for three drafts in a Claude Code session on Sonnet](https://raw.githubusercontent.com/hashswingingslasher/model-hint/assets/demo.gif)
 
 Recorded live with [docs/record-demo.sh](docs/record-demo.sh), from the script in [docs/demo.tape](docs/demo.tape).
 
@@ -21,7 +21,22 @@ What is never sent:
 
 Set `engine` to `rules` and nothing leaves your machine: the hint comes from local word rules only.
 
-The plugin itself makes no network, file or shell calls. The only setting it changes is the model, and only when you press Switch.
+The plugin itself makes no network, file or shell calls, and it reads no credentials or environment variables. The judge call goes through Claude Code's own `$.model.complete`, which uses the session's existing login; the plugin never sees it.
+
+## What it changes and what it hooks
+
+It changes one setting, `model`, and only when you press **Switch** (or its `s` hotkey). It writes through the `/config` Model row (`$.config.set({ key: 'model' })`), the same row `/model` uses, so the new model is saved to your user settings (`~/.claude/settings.json`) and becomes the default for later sessions. The toast names the model it replaced. Nothing else is written.
+
+It hooks these events, all read-only except where noted:
+
+| Hook | What it does |
+| :- | :- |
+| `prompt.edit` | Reads the draft after each edit to classify it. Passes the edit through unchanged. |
+| `prompt.fill` | Reads the draft after another plugin fills the box. Passes the fill through unchanged. |
+| `prompt.submit` | Clears the hint. Passes the prompt through unchanged and never blocks it. |
+| `session.attach`, `session.detach` | Start and stop the 300 ms draft reading on surfaces that send no edits (the VS Code panel). |
+| `ui.render` (`AbovePrompt`) | Draws the band, or leaves the engine's own drawing in place. |
+| `command.run` (`/model-hint`) | Turns the plugin off and on for the session. |
 
 ## Where it runs
 

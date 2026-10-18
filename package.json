@@ -1,6 +1,6 @@
 {
   "name": "model-hint",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "description": "Claude Code mod: suggests haiku, sonnet or opus for the task you are typing",
   "license": "MIT",

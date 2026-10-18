@@ -1,6 +1,7 @@
 #!/bin/sh
-# Records docs/demo.gif: runs docs/demo.tape with VHS, then crops the frame to the
-# band, the prompt and the footer, leaving out the session banner.
+# Records the README demo: runs docs/demo.tape with VHS, then crops the frame to the
+# band, the prompt and the footer, leaving out the session banner. The result is not
+# committed to main; it is published on the assets branch, which the README links to.
 # Needs vhs and ffmpeg, and a Claude Code CLI of 2.1.296 or later on PATH.
 set -eu
 cd "$(dirname "$0")/.."
