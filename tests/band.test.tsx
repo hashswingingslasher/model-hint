@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { ModelCompleteResult, On, PromptEditInput, PromptEditResult } from 'claude-code'
 
-import { PAUSE_MS } from '../hooks/register'
+import { PAUSE_MS, POLL_MS } from '../hooks/register'
 
 const SURFACES = ['terminal', 'desktop'] as const
 
@@ -309,6 +309,42 @@ describe('band', () => {
     // Back on a judged draft: the verdict is there at once, no timer, no call.
     expect((await ui.find({ type: 'Text', text: /typo/ }))?.text).toBe('one-line typo fix')
     await w.clock.advance(PAUSE_MS * 3)
+    expect(w.asked).toHaveLength(1)
+  })
+
+  test('on a surface that raises no prompt.edit, the draft is read on a timer', async ($, on) => {
+    const w = world(on, 'claude-sonnet-5-5')
+    w.reply = () => '{"tier":"opus","reason":"open-ended, huge scope"}'
+    on('session.attach', (_$, e) => ({ clientId: e.clientId }))
+    const ui = await $.ui.mount({ plugin: 'model-hint', surface: 'vscode', component: 'AbovePrompt', props: bandProps })
+    await $.session.attach({ surface: 'vscode', clientId: 'panel' })
+
+    // The panel changes the draft without raising prompt.edit.
+    w.box = { text: 'i need to build a AAA video game similar to GTA 5', cursor: 0 }
+    await w.clock.advance(POLL_MS)
+    expect((await ui.find({ type: 'Text', text: /reading/ }))?.text).toBe('reading the draft...')
+
+    await w.clock.advance(PAUSE_MS)
+    expect(w.asked).toEqual(['i need to build a AAA video game similar to GTA 5'])
+    expect((await ui.find({ type: 'Text', text: 'opus' }))?.text).toBe('opus')
+
+    // An unchanged draft is not judged again.
+    await w.clock.advance(POLL_MS * 5)
+    expect(w.asked).toHaveLength(1)
+  })
+
+  test('the first prompt.edit switches the timer off', async ($, on) => {
+    const w = world(on, 'claude-sonnet-5-5')
+    on('session.attach', (_$, e) => ({ clientId: e.clientId }))
+    await mount($, 'terminal')
+    await $.session.attach({ surface: 'desktop', clientId: 'app' })
+    await type($, 'add a --verbose flag to the CLI')
+    await w.clock.advance(PAUSE_MS)
+    expect(w.asked).toHaveLength(1)
+
+    // With edits arriving, a draft changed behind the box's back is not polled.
+    w.box = { text: 'a draft only a poller would see', cursor: 0 }
+    await w.clock.advance(POLL_MS * 5)
     expect(w.asked).toHaveLength(1)
   })
 

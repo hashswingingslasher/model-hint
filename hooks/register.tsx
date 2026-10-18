@@ -29,6 +29,12 @@ export const PAUSE_MS = 300
 /** Verdicts kept per session, so a draft judged once answers instantly. */
 const CACHE_SIZE = 64
 
+/**
+ * How often the draft is read on a surface that draws the band but raises no
+ * prompt.edit (the VS Code chat panel as of 2.1.301).
+ */
+export const POLL_MS = 300
+
 type Settings = { bias: Bias; show: Show; engine: Engine; judgeModel: string }
 
 function pick<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
@@ -62,6 +68,30 @@ const verdicts = new Map<string, Suggestion>()
 
 // Wall-clock time of the last edit, for the debug log's latency line only.
 let editedAt = 0
+
+// The VS Code chat panel (2.1.301) attaches as a surface and draws the band, but
+// never forwards typing as prompt.edit; it does answer $.prompt.read. While such a
+// surface is attached the draft is read on a timer instead. The first prompt.edit
+// proves the host forwards edits and switches the timer off for the session.
+let poller: Timer | undefined
+let hearsEdits = false
+let lastPolled = ''
+
+function stopPolling(): void {
+  poller?.cancel()
+  poller = undefined
+}
+
+async function poll($: EngineInterface, settings: Settings): Promise<void> {
+  if (hearsEdits) {
+    stopPolling()
+    return
+  }
+  const box = await $.prompt.read()
+  if (box.text === lastPolled) return
+  lastPolled = box.text
+  await onDraft($, box.text, settings)
+}
 
 function cacheKey(settings: Settings, draft: string): string {
   return `${settings.judgeModel}\u0000${draft.trim()}`
@@ -210,8 +240,29 @@ export const register: Register = (on, options) => {
     return { text: enabled ? 'Model hint on.' : 'Model hint off for this session.' }
   }).catch(() => ({ text: 'Model hint: could not toggle, see the debug log.' }))
 
+  on('session.attach', async ($, e, next) => {
+    const attached = await next(e)
+    if (e.surface !== 'terminal' && !hearsEdits && poller === undefined) {
+      poller = $.clock.every(POLL_MS, () => {
+        void poll($, settings)
+      })
+    }
+    return attached
+  })
+
+  on('session.detach', async ($, e, next) => {
+    const detached = await next(e)
+    const remote = (await $.session.surfaces()).filter(surface => surface !== 'terminal')
+    if (remote.length === 0) stopPolling()
+    return detached
+  })
+
   // Fires on each edit the composer makes; `next(e)` resolves the box after it.
   on('prompt.edit', async ($, e, next) => {
+    if (!hearsEdits) {
+      hearsEdits = true
+      stopPolling()
+    }
     const box = await next(e)
     await onDraft($, box.text, settings)
     return box
@@ -230,6 +281,7 @@ export const register: Register = (on, options) => {
   // A failure here must never hold a prompt back: let it through untouched.
   on('prompt.submit', async ($, e, next) => {
     cancelPending()
+    lastPolled = ''
     await update($, suggestion, () => null)
     await update($, isDismissed, () => false)
     await update($, judgeNote, () => null)

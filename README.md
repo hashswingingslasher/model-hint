@@ -16,11 +16,11 @@ While you type it says `reading the draft...`; the verdict lands 1.2 to 1.9 s af
 | :- | :- | :- |
 | Claude Code in a terminal | Yes | Seen working on 2.1.296 and 2.1.299 |
 | VS Code, terminal mode | Yes | Same engine as above; setup below |
-| VS Code, graphical chat panel | No | The panel sends no keystroke events to mods and has no band to draw into. Tracked upstream in [#99045](https://github.com/anthropics/claude-code/issues/99045) and [#99401](https://github.com/anthropics/claude-code/issues/99401) |
+| VS Code, graphical chat panel | Yes, from extension 2.1.301 | Seen working on 18 Oct 2026. The panel draws the band but sends no keystroke events, so model-hint reads the draft every 300 ms while the panel is attached. Earlier extensions draw nothing ([#99045](https://github.com/anthropics/claude-code/issues/99045)) |
 | JetBrains terminal, Claude Code Desktop | Expected | Not yet seen working |
 | Windows | Untested | |
 
-**VS Code setup.** The extension's terminal mode runs whatever `claude` is first on your PATH, and the extension does not install one.
+**VS Code setup.** On extension 2.1.301 or later the chat panel works once the plugin is installed; nothing else to set up. On older extensions, use terminal mode. It runs whatever `claude` is first on your PATH, and the extension does not install one.
 
 1. Install or upgrade the standalone CLI to 2.1.296 or later (`npm i -g @anthropic-ai/claude-code`), and check `claude --version` in a new terminal.
 2. In VS Code settings, turn on `claudeCode.useTerminal`.
@@ -86,6 +86,7 @@ Three hooks and one render site, all in [hooks/register.tsx](hooks/register.tsx)
 - `prompt.fill` covers a draft another plugin wrote into the box, which raises no edit.
 - `prompt.submit` clears the hint.
 - `ui.render` on `AbovePrompt` reads the hint, the session's model and the Hide state and draws the band, or yields to the engine. A failed model pass is logged to the debug log (`claude --debug`) and named in the band.
+- `session.attach` starts a 300 ms timer that reads the draft with `$.prompt.read()` when a surface attaches that draws the band but raises no `prompt.edit` (the VS Code panel). The first `prompt.edit` switches the timer off for the session, so the terminal never polls.
 - `$.ui.status` mirrors the hint under the prompt until a band has drawn once. It is kept for surfaces not yet checked, such as mobile; it does not help in the VS Code panel, where none of the hooks above fire.
 
 [hooks/classify.ts](hooks/classify.ts) and [hooks/judge.ts](hooks/judge.ts) are pure and have no engine dependency; [hooks/model.ts](hooks/model.ts) maps a model id to a tier. The `$.state` contract is in [types/index.d.ts](types/index.d.ts).

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0, 18 October 2026
+
+- **Works in the VS Code chat panel** on extension 2.1.301 and later. That extension draws mod bands but still sends no `prompt.edit`, so while such a surface is attached model-hint reads the draft every 300 ms; the first `prompt.edit` turns this off. Seen working live in the panel. See [docs/adr/0002](docs/adr/0002-vscode-panel-by-polling.md).
+
 ## 0.5.0, 15 October 2026
 
 - Faster verdicts: the pause before the judge drops from 600 ms to 300 ms, and a draft judged once in the session answers instantly from a cache. Live, the verdict now lands 1.2 to 1.9 s after the last keystroke (median about 1.5 s), down from about 2.1 s.
