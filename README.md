@@ -1,5 +1,7 @@
 # model-hint
 
+[![CI](https://github.com/hashswingingslasher/model-hint/actions/workflows/ci.yml/badge.svg)](https://github.com/hashswingingslasher/model-hint/actions/workflows/ci.yml)
+
 A Claude Code mod that reads the prompt as you type and suggests the model tier the task wants, in a band above the prompt. Two passes: word rules answer on every keystroke for free, then, once you pause for 300 ms, a small model (haiku by default) reads the draft and its verdict replaces the rules'. One short completion per pause, nothing while you are typing.
 
 ![model-hint suggesting opus, haiku and sonnet for three drafts in a Claude Code session on Sonnet](docs/demo.gif)
@@ -96,7 +98,9 @@ claude plugin test .       # tests/*.test.ts against the engine's own runtime
 npm install && npm run typecheck
 ```
 
-`tsc` needs the API declarations the engine lays in `.claude-plugin/types/` the first time it loads the mod from this folder (`claude --plugin-dir .`). They are gitignored.
+`tsc` needs the API declarations the engine lays in `.claude-plugin/types/` the first time it loads the mod from this folder (`claude --plugin-dir .`). They are gitignored. `tsconfig.core.json` checks the engine-free core (`classify.ts`, `model.ts`) without them.
+
+CI runs that core typecheck, then `plugin validate --strict` and `plugin test` on Claude Code 2.1.296 (the minimum, required) and on the latest release (allowed to fail, so API drift shows without blocking a merge).
 
 **Live check (haiku judge, 10 prompts labelled before the run: 3 haiku, 4 sonnet, 3 opus).** 10 of 10 matched (14 Oct 2026). In live terminal sessions on 15 Oct the verdict landed 1.2 to 1.9 s after the last keystroke, median about 1.5 s. Run with `claude --debug` to see the same timing for your own prompts: each verdict logs its time after the last edit, split into the pause and the judge call.
 
