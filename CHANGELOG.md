@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.1, 18 October 2026
+
+Security and privacy fixes from an audit before promotion.
+
+- `/model-hint` off now stops the model calls. Before, it only hid the band, and drafts were still sent.
+- A draft that looks like a credential (API keys, tokens, private keys) is never sent; the band says so.
+- At most 4,000 characters of a draft are sent, and the rules read at most 8,000, so a large paste cannot make every pause or keystroke expensive.
+- The step counter no longer slows down quadratically on blank lines (50,000 blank lines took 1.6 s per keystroke).
+- Control, zero-width and bidirectional characters are stripped from the judge's reason before it is shown; oversized replies are refused.
+- The Switch toast says the default model changed and what it was, since the Model row, like `/model`, saves it for later sessions. Switch is hidden while a turn runs.
+- Background work and hooks now catch and log their own errors; `#` memory notes are never sent.
+- README: new Privacy section.
+
 ## 0.6.0, 18 October 2026
 
 - **Works in the VS Code chat panel** on extension 2.1.301 and later. That extension draws mod bands but still sends no `prompt.edit`, so while such a surface is attached model-hint reads the draft every 300 ms; the first `prompt.edit` turns this off. Seen working live in the panel. See [docs/adr/0002](docs/adr/0002-vscode-panel-by-polling.md).

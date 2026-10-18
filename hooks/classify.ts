@@ -72,17 +72,24 @@ const SIGNALS: Signal[] = [
   { label: 'short ask', weight: -1, test: d => d.trim().length < 40 },
 ]
 
+/**
+ * The rules read at most this much of a draft. Past it the shape of a request
+ * is clear, and every keystroke stays cheap however much is pasted.
+ */
+export const READ_LIMIT = 8000
+
 /** Numbered items, bullets, or "then"/"after that" chains count as steps. */
 export function countSteps(draft: string): number {
-  const listed = (draft.match(/(?:^|\n)\s*(?:\d+[.)]|[-*•])\s+\S/g) ?? []).length
+  // [ \t] rather than \s: a \s* that can cross newlines goes quadratic on blank lines.
+  const listed = (draft.match(/^[ \t]*(?:\d+[.)]|[-*•])[ \t]+\S/gm) ?? []).length
   const chained = (draft.match(/\b(?:then|after that|next|finally|afterwards|once that)\b/gi) ?? []).length
   return Math.max(listed, chained + 1)
 }
 
-/** Drafts the model never sees: slash commands, shell escapes, nothing typed. */
+/** Drafts the model never sees: slash commands, shell escapes, memory notes, nothing typed. */
 export function isSkippable(draft: string): boolean {
   const t = draft.trimStart()
-  return t.length === 0 || t.startsWith('/') || t.startsWith('!')
+  return t.length === 0 || t.startsWith('/') || t.startsWith('!') || t.startsWith('#')
 }
 
 const THRESHOLDS: Record<Bias, { up: number; down: number }> = {
@@ -91,8 +98,10 @@ const THRESHOLDS: Record<Bias, { up: number; down: number }> = {
   quality: { up: 2, down: -3 },
 }
 
-export function classify(draft: string, bias: Bias = 'balanced'): Suggestion | null {
-  if (isSkippable(draft)) return null
+export function classify(whole: string, bias: Bias = 'balanced'): Suggestion | null {
+  if (isSkippable(whole)) return null
+  // Length still counts as a signal past the limit, so the brief keeps its weight.
+  const draft = whole.length > READ_LIMIT ? whole.slice(0, READ_LIMIT) : whole
 
   const lower = draft.toLowerCase()
   const hits = SIGNALS.filter(s => s.test(draft, lower))

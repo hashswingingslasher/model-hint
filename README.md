@@ -10,6 +10,19 @@ Recorded live with [docs/record-demo.sh](docs/record-demo.sh), from the script i
 
 While you type it says `reading the draft...`; the verdict lands 1.2 to 1.9 s after you stop typing (a 300 ms pause, then a haiku call that measured 0.9 to 1.6 s). A draft judged once in the session answers instantly from a cache. The Switch button appears only when the session's model does not cover the verdict; a covered one reads `opus  hard concurrency bug · covered by fable`. The band clears when you submit.
 
+## Privacy
+
+With the default `engine: model`, your **unsent draft** leaves your machine. About 300 ms after you stop typing, the first 4,000 characters go to the judge model through Claude Code's own connection: your login, your configured provider (Anthropic, Bedrock, Vertex or a gateway), billed like any request and counted against your plan. Another installed plugin that hooks `model.complete` can see those calls too.
+
+What is never sent:
+- drafts that look like a credential (API keys, tokens, private keys); the band shows `not sent, looks like a secret`
+- slash commands, `!` shell escapes, `#` memory notes, and drafts under 15 characters
+- anything at all after `/model-hint` turns it off for the session
+
+Set `engine` to `rules` and nothing leaves your machine: the hint comes from local word rules only.
+
+The plugin itself makes no network, file or shell calls. The only setting it changes is the model, and only when you press Switch.
+
 ## Where it runs
 
 | Where | Works | Notes |
@@ -63,9 +76,9 @@ claude --plugin-dir /path/to/model-hint
 
 A session on Fable counts as covering an opus hint, so the band does not ask you to step down.
 
-**Switch to &lt;tier&gt;** changes the session's model through the `/config` Model row. Where that row is not available or is locked by policy, the button shows a toast with the `/model` command to type instead. **Hide** closes the band until the hint changes or you submit. `s` and `h` press them while the band has focus (`ctrl+x tab`).
+**Switch to &lt;tier&gt;** changes the model through the `/config` Model row. Like `/model`, this also saves it as your default for later sessions, and a toast says what it was before. It is hidden while Claude is working. Where that row is not available or is locked by policy, the button shows a toast with the `/model` command to type instead. **Hide** closes the band until the hint changes or you submit. `s` and `h` press them while the band has focus (`ctrl+x tab`).
 
-`/model-hint` turns the band off and on for the session.
+`/model-hint` turns it off and on for the session. Off stops the model calls too, not only the band.
 
 ## Options
 

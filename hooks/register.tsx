@@ -87,14 +87,28 @@ async function poll($: EngineInterface, settings: Settings): Promise<void> {
     stopPolling()
     return
   }
-  const box = await $.prompt.read()
-  if (box.text === lastPolled) return
-  lastPolled = box.text
-  await onDraft($, box.text, settings)
+  try {
+    const box = await $.prompt.read()
+    if (box.text === lastPolled) return
+    lastPolled = box.text
+    await onDraft($, box.text, settings)
+  } catch (err) {
+    $.ui.log(`model-hint: reading the draft failed: ${String(err)}`, { to: 'debug' })
+  }
+}
+
+/** FNV-1a over the text, so the cache holds a short key rather than the draft itself. */
+function fingerprint(text: string): string {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return `${(hash >>> 0).toString(36)}:${text.length}`
 }
 
 function cacheKey(settings: Settings, draft: string): string {
-  return `${settings.judgeModel}\u0000${draft.trim()}`
+  return `${settings.judgeModel}:${fingerprint(draft.trim().slice(0, judge.SEND_LIMIT))}`
 }
 
 function remember(key: string, verdict: Suggestion): void {
@@ -148,6 +162,8 @@ function cancelPending(): number {
 async function onDraft($: EngineInterface, draft: string, settings: Settings): Promise<void> {
   const mine = cancelPending()
   editedAt = Date.now()
+  // Off means off: nothing is classified, and nothing is sent.
+  if (!(await read($, isEnabled))) return
 
   const rules = classify(draft, settings.bias)
   await update($, judgeNote, () => null)
@@ -165,13 +181,27 @@ async function onDraft($: EngineInterface, draft: string, settings: Settings): P
   await mirror($, settings)
 
   if (settings.engine !== 'model' || rules === null || draft.trim().length < judge.MIN_LENGTH) return
+  if (judge.looksSecret(draft.slice(0, judge.SEND_LIMIT))) {
+    await update($, judgeNote, () => 'not sent, looks like a secret')
+    await mirror($, settings)
+    return
+  }
   pending = $.clock.after(PAUSE_MS, () => {
     void ask($, draft, mine, settings)
   })
 }
 
-/** The model pass. A verdict lands only while it is still the latest and the draft has not moved on. */
+/** The model pass, guarded: a failure anywhere in it is logged, never thrown into a timer. */
 async function ask($: EngineInterface, draft: string, mine: number, settings: Settings): Promise<void> {
+  try {
+    await judgeDraft($, draft, mine, settings)
+  } catch (err) {
+    $.ui.log(`model-hint: model pass failed: ${String(err)}`, { to: 'debug' })
+  }
+}
+
+/** A verdict lands only while it is still the latest and the draft has not moved on. */
+async function judgeDraft($: EngineInterface, draft: string, mine: number, settings: Settings): Promise<void> {
   const stop = new AbortController()
   inflight = stop
   const firedAt = Date.now()
@@ -236,6 +266,11 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: COMMAND }, async $ => {
     const enabled = await update($, isEnabled, was => !was)
+    if (!enabled) {
+      cancelPending()
+      await update($, suggestion, () => null)
+      await update($, judgeNote, () => null)
+    }
     await mirror($, settings)
     return { text: enabled ? 'Model hint on.' : 'Model hint off for this session.' }
   }).catch(() => ({ text: 'Model hint: could not toggle, see the debug log.' }))
@@ -266,7 +301,7 @@ export const register: Register = (on, options) => {
     const box = await next(e)
     await onDraft($, box.text, settings)
     return box
-  })
+  }).catch((_$, e, next) => next(e))
 
   // A plugin's fill replaces the draft without a prompt.edit, so re-read it.
   on('prompt.fill', async ($, e, next) => {
@@ -276,7 +311,7 @@ export const register: Register = (on, options) => {
       await onDraft($, box.text, settings)
     }
     return filled
-  })
+  }).catch((_$, e, next) => next(e))
 
   // A failure here must never hold a prompt back: let it through untouched.
   on('prompt.submit', async ($, e, next) => {
@@ -329,9 +364,15 @@ export const register: Register = (on, options) => {
         $.ui.toast(`Type /model ${tier} to switch`)
         return
       }
+      const before = await $.session.model()
       const set = await $.config.set({ key: 'model', value: tier })
-      if (set.deny) $.ui.toast(`Could not switch: ${set.deny}. Type /model ${tier}`)
-      else await update($, isDismissed, () => true)
+      if (set.deny) {
+        $.ui.toast(`Could not switch: ${set.deny}. Type /model ${tier}`)
+        return
+      }
+      // Like /model, the Model row saves the default for later sessions too; say so.
+      $.ui.toast(`Default model is now ${tier} (was ${before}), same as /model`)
+      await update($, isDismissed, () => true)
     }
 
     const detail = [
@@ -350,9 +391,9 @@ export const register: Register = (on, options) => {
         <Text dimColor wrap="truncate-end">
           {detail}
         </Text>
-        {!covered && <Button key="switch" label={`Switch to ${tier}`} hotkey="s" onPress={switchTo} />}
+        {!covered && !e.props.isWorking && <Button key="switch" label={`Switch to ${tier}`} hotkey="s" onPress={switchTo} />}
         {hide}
       </Box>
     )
-  })
+  }).catch((_$, e, next) => next(e))
 }

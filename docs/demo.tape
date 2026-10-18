@@ -18,7 +18,8 @@ Set CursorBlink false
 
 Hide
 # A clean environment: nothing inherited from a Claude Code session that launched this.
-Type "env -u CLAUDECODE -u CLAUDE_CODE_CHILD_SESSION -u CLAUDE_CODE_SESSION_ID -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_EXECPATH -u CLAUDE_CODE_MESSAGING_SOCKET -u CLAUDE_CODE_MESSAGING_TOKEN -u CLAUDE_PID claude --plugin-dir . --model sonnet"
+# Starts only from the repository root: the Down/Enter below answers a trust dialog for this folder.
+Type "test -f .claude-plugin/plugin.json && env -u CLAUDECODE -u CLAUDE_CODE_CHILD_SESSION -u CLAUDE_CODE_SESSION_ID -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_EXECPATH -u CLAUDE_CODE_MESSAGING_SOCKET -u CLAUDE_CODE_MESSAGING_TOKEN -u CLAUDE_PID claude --plugin-dir . --model sonnet"
 Enter
 Sleep 9s
 # Picks "Yes, I trust this folder" if the workspace trust dialog is up (its default is

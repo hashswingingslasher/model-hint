@@ -1,6 +1,6 @@
 {
   "name": "model-hint",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Suggests haiku, sonnet or opus for the task you are typing, live, in a band above the prompt. Instant word rules, then a small model reads the draft when you pause.",
   "author": {
     "name": "Berwin D.",

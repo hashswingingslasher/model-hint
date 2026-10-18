@@ -82,7 +82,26 @@ describe('countSteps', () => {
   })
 })
 
+describe('hostile drafts', () => {
+  test('stay fast: blank-line floods, huge pastes', () => {
+    for (const draft of ['x' + '\n'.repeat(200000) + 'y', 'a'.repeat(500000), '- a\n'.repeat(100000)]) {
+      const t0 = Date.now()
+      classify(draft)
+      expect(Date.now() - t0).toBeLessThan(100)
+    }
+  })
+
+  test('bullets indented with spaces or tabs still count as steps', () => {
+    expect(countSteps('  - one\n\t- two\n- three')).toBe(3)
+    expect(countSteps('1. a\n   2) b\n3. c')).toBe(3)
+  })
+})
+
 describe('isSkippable', () => {
+  test('memory notes are not sent', () => {
+    expect(isSkippable('# remember to use pnpm')).toBe(true)
+  })
+
   test('leading whitespace does not hide a command', () => {
     expect(isSkippable('  /help')).toBe(true)
     expect(isSkippable('  ! ls')).toBe(true)
