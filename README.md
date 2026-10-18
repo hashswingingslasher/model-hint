@@ -107,6 +107,7 @@ Tests cover the rules on their own, the judge's prompt and reply parsing, the mo
 
 ## Limits
 
+- The verdict's speed is set by the network round trip, not the model. On 18 Oct 2026, Haiku 5.5 and Haiku 4.5 measured the same as the judge (median 0.95 to 0.99 s, both 10 of 10 accurate), and Haiku 4.5 costs ten times as much per token, so `haiku` stays the default.
 - The rules pass reads words, not intent, and is only there to answer instantly. The model pass is the real judgment, and it costs one small completion per pause; set `engine` to `rules` to avoid that.
 - It knows three tiers. Provider-specific ids are mapped by the substring `haiku`, `sonnet`, `opus` or `fable`; anything else is treated as unknown and the band always shows.
 - The switch button depends on the `/config` Model row, which policy can lock.
