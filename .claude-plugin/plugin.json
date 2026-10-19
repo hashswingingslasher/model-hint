@@ -8,6 +8,9 @@
   },
   "homepage": "https://github.com/hashswingingslasher/model-hint",
   "repository": "https://github.com/hashswingingslasher/model-hint",
+  "documentationUrl": "https://github.com/hashswingingslasher/model-hint#readme",
+  "supportUrl": "https://github.com/hashswingingslasher/model-hint/issues",
+  "privacyPolicyUrl": "https://github.com/hashswingingslasher/model-hint#privacy",
   "license": "MIT",
   "keywords": [
     "model",
