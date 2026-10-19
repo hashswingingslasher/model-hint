@@ -2,8 +2,7 @@
   "name": "model-hint",
   "description": "Berwin's Claude Code mods: model-hint, a live model-tier hint above the prompt",
   "owner": {
-    "name": "Berwin D.",
-    "url": "https://github.com/hashswingingslasher"
+    "name": "Berwin D."
   },
   "plugins": [
     {

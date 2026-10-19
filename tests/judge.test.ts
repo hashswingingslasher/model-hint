@@ -61,7 +61,7 @@ describe('judge hardening', () => {
       join('sk', '-an', 't-', 'api03-', 'q'.repeat(24)),
       join('gh', 'p_', 'q'.repeat(36)),
       join('AK', 'IA', 'Q'.repeat(16)),
-      join('-----BEGIN OPENSSH ', 'PRIV', 'ATE KEY-----'),
+      join('-'.repeat(5), 'BEG', 'IN OPENSSH ', 'PRIV', 'ATE KEY', '-'.repeat(5)),
       join('xo', 'xb-', '1'.repeat(10), '-', 'q'.repeat(10)),
     ]) expect(looksSecret(`please check ${secret} for me`)).toBe(true)
     for (const fine of ['fix the sk- prefix handling', 'rename AKIA to AWS', 'add a private key loader']) {
