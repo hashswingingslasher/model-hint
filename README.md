@@ -6,7 +6,7 @@ A Claude Code mod that reads the prompt as you type and suggests the model tier 
 
 ![model-hint suggesting opus, haiku and sonnet for three drafts in a Claude Code session on Sonnet](https://raw.githubusercontent.com/hashswingingslasher/model-hint/assets/demo.gif)
 
-Recorded live with [docs/record-demo.sh](docs/record-demo.sh), from the script in [docs/demo.tape](docs/demo.tape).
+Recorded live with VHS; the GIF and the script that records it are on the [`assets` branch](https://github.com/hashswingingslasher/model-hint/tree/assets).
 
 While you type it says `reading the draft...`; the verdict lands 1.2 to 1.9 s after you stop typing (a 300 ms pause, then a haiku call that measured 0.9 to 1.6 s). A draft judged once in the session answers instantly from a cache. The Switch button appears only when the session's model does not cover the verdict; a covered one reads `opus  hard concurrency bug · covered by fable`. The band clears when you submit.
 

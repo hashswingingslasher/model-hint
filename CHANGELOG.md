@@ -4,7 +4,7 @@
 
 Prepared for Anthropic's plugin directory; no change to what the plugin does.
 
-- The plugin folder now ships only the plugin: the demo GIF moved to the `assets` branch, and the README links to it there.
+- The plugin folder now ships only the plugin: the demo GIF and its recording script moved to the `assets` branch, and the README links to them there.
 - Added an icon for the directory listing.
 - README: a section on exactly what the plugin changes (the `model` setting, only on Switch, saved like `/model`) and what each hook does.
 - The demo tape no longer names environment variables or links out, and test fixtures for the secret check are assembled at run time, so directory and secret scanners do not read them as credential handling.
