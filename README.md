@@ -91,9 +91,9 @@ claude --plugin-dir /path/to/model-hint
 
 A session on Fable counts as covering an opus hint, so the band does not ask you to step down.
 
-**Switch to &lt;tier&gt;** changes the model through the `/config` Model row. Like `/model`, this also saves it as your default for later sessions, and a toast says what it was before. It is hidden while Claude is working. Where that row is not available or is locked by policy, the button shows a toast with the `/model` command to type instead. **Hide** closes the band until the hint changes or you submit. `s` and `h` press them while the band has focus (`ctrl+x tab`).
+**Switch to &lt;tier&gt;** changes the model through the `/config` Model row. Like `/model`, this also saves it as your default for later sessions, and a toast says what it was before. It is hidden while Claude is working. Where that row is not available or is locked by policy, the button shows a toast with the `/model` command to type instead. **Hide** closes the band for the prompt you are writing; it comes back when you send it or clear the box. **Off** turns model-hint off for the rest of the session: no band and no model calls. `s`, `h` and `o` press them while the band has focus (`ctrl+x tab`).
 
-`/model-hint` turns it off and on for the session. Off stops the model calls too, not only the band.
+`/model-hint` turns it off and on for the session, the same as the Off button. Off stops the model calls too, not only the band.
 
 ## Options
 

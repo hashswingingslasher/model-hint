@@ -46,14 +46,26 @@ function sameSuggestion(a: Suggestion | null, b: Suggestion | null): boolean {
   return a.tier === b.tier && a.reasons.join('|') === b.reasons.join('|')
 }
 
-/** Writes the hint only when it changed, so a stable classification never redraws; a change also clears a Hide. */
-async function publish($: EngineInterface, next: Suggestion | null, force: boolean): Promise<void> {
-  let changed = false
-  await update($, suggestion, prev => {
-    changed = !sameSuggestion(prev, next)
-    return changed ? next : prev
-  })
-  if (changed || force) await update($, isDismissed, () => false)
+/**
+ * Writes the hint only when it changed, so a stable classification never redraws.
+ * A Hide lasts for the prompt being written: a new verdict does not undo it, only
+ * sending the prompt or clearing the box (`newPrompt`) does.
+ */
+async function publish($: EngineInterface, next: Suggestion | null, newPrompt: boolean): Promise<void> {
+  await update($, suggestion, prev => (sameSuggestion(prev, next) ? prev : next))
+  if (newPrompt) await update($, isDismissed, () => false)
+}
+
+/** Turns the plugin on or off for the session. Off stops the model calls as well as the band. */
+async function setEnabled($: EngineInterface, settings: Settings, on: boolean): Promise<void> {
+  await update($, isEnabled, () => on)
+  if (!on) {
+    cancelPending()
+    await update($, suggestion, () => null)
+    await update($, judgeNote, () => null)
+  }
+  await update($, isDismissed, () => false)
+  await mirror($, settings)
 }
 
 // One pending model pass at a time, for the draft as it stood when the person
@@ -177,7 +189,7 @@ async function onDraft($: EngineInterface, draft: string, settings: Settings): P
 
   const held = await read($, suggestion)
   const keepModelVerdict = held?.source === 'model' && rules !== null
-  if (!keepModelVerdict) await publish($, rules, isSkippable(draft))
+  if (!keepModelVerdict) await publish($, rules, draft.trim().length === 0)
   await mirror($, settings)
 
   if (settings.engine !== 'model' || rules === null || draft.trim().length < judge.MIN_LENGTH) return
@@ -265,14 +277,9 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: COMMAND }, async $ => {
-    const enabled = await update($, isEnabled, was => !was)
-    if (!enabled) {
-      cancelPending()
-      await update($, suggestion, () => null)
-      await update($, judgeNote, () => null)
-    }
-    await mirror($, settings)
-    return { text: enabled ? 'Model hint on.' : 'Model hint off for this session.' }
+    const enabled = !(await read($, isEnabled))
+    await setEnabled($, settings, enabled)
+    return { text: enabled ? 'Model hint on.' : 'Model hint off for this session. /model-hint turns it back on.' }
   }).catch(() => ({ text: 'Model hint: could not toggle, see the debug log.' }))
 
   on('session.attach', async ($, e, next) => {
@@ -345,7 +352,17 @@ export const register: Register = (on, options) => {
 
     const { Box, Button, Text } = $.ui.resolve(e)
     const tier = hint.tier
-    const hide = <Button key="hide" label="Hide" hotkey="h" onPress={() => update($, isDismissed, () => true)} />
+    const turnOff = async () => {
+      await setEnabled($, settings, false)
+      $.ui.toast('model-hint is off for this session. /model-hint turns it back on.')
+    }
+    // Hide: gone until this prompt is sent or cleared. Off: gone, and no model calls, for the session.
+    const hide = (
+      <>
+        <Button key="hide" label="Hide" hotkey="h" onPress={() => update($, isDismissed, () => true)} />
+        <Button key="off" label="Off" hotkey="o" onPress={turnOff} />
+      </>
+    )
 
     // The rules' guess is never shown as a tier while the model is still reading.
     if (hint.source === 'rules' && settings.engine === 'model' && note === null) {

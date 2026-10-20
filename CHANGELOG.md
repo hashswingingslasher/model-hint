@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.3, 20 October 2026
+
+- **Fix:** Hide no longer comes back on its own. It used to clear whenever the verdict changed, so the band reappeared as you kept typing. Hide now lasts for the prompt you are writing, until you send it or clear the box.
+- New **Off** button (`o`): turns model-hint off for the session, band and model calls both, like `/model-hint`. A toast says how to turn it back on.
+
 ## 0.6.2, 18 October 2026
 
 Prepared for Anthropic's plugin directory; no change to what the plugin does.

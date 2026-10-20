@@ -119,7 +119,7 @@ describe('band', () => {
       expect(await ui.find({ key: 'hide' })).toBeUndefined()
     })
 
-    test(`${surface}: Hide removes the band until the hint changes`, { options: { engine: 'rules' } }, async ($, on) => {
+    test(`${surface}: Hide removes the band for the rest of this prompt`, { options: { engine: 'rules' } }, async ($, on) => {
       world(on, 'claude-haiku-5-5')
       const ui = await mount($, surface)
       await type($, 'add a --verbose flag to the CLI and log the resolved config when it is set')
@@ -131,10 +131,61 @@ describe('band', () => {
       await type($, 'add a --verbose flag to the CLI and log the resolved config when it is set please')
       expect(await ui.find({ type: 'Text', text: 'sonnet' })).toBeUndefined()
 
-      // A different hint comes back.
+      // A different verdict does not bring it back: Hide lasts for this prompt.
+      await type($, 'refactor the auth module across the whole codebase to use the new session store')
+      expect(await ui.find({ type: 'Text', text: 'opus' })).toBeUndefined()
+      expect(await ui.findAll({ type: 'Button' })).toHaveLength(0)
+
+      // Clearing the box starts a new prompt, and the band returns for it.
+      await type($, '')
       await type($, 'refactor the auth module across the whole codebase to use the new session store')
       expect((await ui.find({ type: 'Text', text: 'opus' }))?.text).toBe('opus')
-      expect((await ui.find({ type: 'Text', text: /refactor/ }))?.text).toContain('refactor')
+    })
+
+    test(`${surface}: after Hide, sending the prompt brings the band back for the next one`, { options: { engine: 'rules' } }, async ($, on) => {
+      world(on, 'claude-haiku-5-5')
+      on('prompt.submit', (_$, e) => ({ text: e.text }))
+      const ui = await mount($, surface)
+      await type($, 'add a --verbose flag to the CLI and log the resolved config when it is set')
+      await ui.press({ key: 'hide' })
+      await $.prompt.submit({ text: 'x', wait: false, origin: { kind: 'composer' } })
+
+      await type($, 'refactor the auth module across the whole codebase to use the new session store')
+      expect((await ui.find({ type: 'Text', text: 'opus' }))?.text).toBe('opus')
+    })
+
+    test(`${surface}: the Off button stops the band and the model calls for the session`, async ($, on) => {
+      const w = world(on, 'claude-sonnet-5-5')
+      w.reply = () => '{"tier":"opus","reason":"open-ended, huge scope"}'
+      const toasts: string[] = []
+      on('ui.toast', (_$, e) => {
+        toasts.push(e.text)
+        return { value: undefined }
+      })
+      on('command.run', () => ({ text: '' }))
+      const ui = await mount($, surface)
+      await type($, 'i need to build a AAA video game similar to GTA 5')
+      await w.clock.advance(PAUSE_MS)
+      expect(w.asked).toHaveLength(1)
+
+      await ui.press({ key: 'off' })
+      expect(toasts.at(-1)).toBe('model-hint is off for this session. /model-hint turns it back on.')
+      expect(await ui.findAll({ type: 'Button' })).toHaveLength(0)
+
+      // Off survives new prompts and pauses: nothing is drawn, nothing is sent.
+      await type($, '')
+      await type($, 'design the architecture for moving our monolith to event sourcing')
+      await w.clock.advance(PAUSE_MS * 5)
+      expect(w.asked).toHaveLength(1)
+      expect(await ui.findAll({ type: 'Button' })).toHaveLength(0)
+
+      // /model-hint turns it back on.
+      const back = await $.command.run({ command: 'model-hint', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } })
+      expect(back.text).toBe('Model hint on.')
+      await type($, 'design the architecture for moving our monolith to event sourcing and plan it')
+      await w.clock.advance(PAUSE_MS)
+      expect(w.asked).toHaveLength(2)
+      expect((await ui.find({ type: 'Text', text: 'opus' }))?.text).toBe('opus')
     })
 
     test(`${surface}: submitting clears the hint`, { options: { engine: 'rules' } }, async ($, on) => {
@@ -354,7 +405,7 @@ describe('band', () => {
     const ui = await mount($, 'terminal')
     const toggle = { command: 'model-hint', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
     const off = await $.command.run(toggle)
-    expect(off.text).toBe('Model hint off for this session.')
+    expect(off.text).toBe('Model hint off for this session. /model-hint turns it back on.')
 
     await type($, 'i need to build a AAA video game similar to GTA 5')
     await w.clock.advance(PAUSE_MS * 5)
